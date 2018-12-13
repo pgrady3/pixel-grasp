@@ -76,6 +76,8 @@ for filter_sizes in FILTER_SIZES:
 
         ae.summary()
 
+        print "HERE----------------"
+
         with open(os.path.join(OUTPUT_FOLDER, '_description.txt'), 'w') as f:
             # Write description to file.
             f.write(NETWORK_NOTES)
@@ -89,13 +91,17 @@ for filter_sizes in FILTER_SIZES:
             ModelCheckpoint(os.path.join(OUTPUT_FOLDER, 'epoch_{epoch:02d}_model.hdf5'), period=1),
         ]
 
-        train_set, test_set = datagen.get_data_list()
-        train_generator = datagen.DataGenerator(train_set, batch_size = BATCH_SIZE)
-        test_generator = datagen.DataGenerator(test_set, batch_size = BATCH_SIZE)
+        print "MAKING GENERATORS"
+
+        #train_set, test_set = datagen.get_data_list()
+        train_generator = datagen.DataGenerator(batch_size = BATCH_SIZE, train=True)
+        test_generator = datagen.DataGenerator(batch_size = BATCH_SIZE, train=False)
+
+        print "ABOUT TO TRAIN---------------------------"
 
         ae.fit_generator(generator=train_generator, validation_data=test_generator,
                         use_multiprocessing=True,
-                        workers=4,
+                        workers=8,
                         epochs=100,
                         shuffle=True,
                         callbacks=my_callbacks,

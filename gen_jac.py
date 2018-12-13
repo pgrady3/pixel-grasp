@@ -2,39 +2,30 @@ import datetime
 import glob
 import os
 
-import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from skimage import io
 import cv2
 import random
 
+from joblib import Parallel, delayed
+
 from dataset_processing.image import Image, DepthImage
 from dataset_processing import grasp
 
 
-DATASET_NAME = 'jacquard'
-OUTPUT_DIR = 'data/datasets'
-RAW_DATA_DIR = 'data/jacquard'
+OUTPUT_TEST_DIR = 'data/test/'
+OUTPUT_TRAIN_DIR = 'data/train/'
 OUTPUT_IMG_SIZE = (300, 300)
-RANDOM_ROTATIONS = 3
-RANDOM_ZOOM = True
+RANDOM_ROTATIONS = 1
+RANDOM_ZOOM = False
 
 TRAIN_SPLIT = 0.8
 # OR specify which images are in the test set.
-TEST_IMAGES = None
 VISUALISE_ONLY = False
-
-# File name patterns for the different file types.  _ % '<image_id>'
-#_rgb_pattern = os.path.join(RAW_DATA_DIR, 'pcd%sr.png')
-#_pcd_pattern = os.path.join(RAW_DATA_DIR, 'pcd%s.txt')
-#_pos_grasp_pattern = os.path.join(RAW_DATA_DIR, 'pcd%scpos.txt')
-#_neg_grasp_pattern = os.path.join(RAW_DATA_DIR, 'pcd%scneg.txt')
-
 
 def get_image_ids():
     # Get all the input files, extract the numbers.
-
     ims = glob.glob("./data/jacquard/*/*_RGB*")
 
     roots = []
@@ -45,52 +36,22 @@ def get_image_ids():
 
     return roots
 
-
-if __name__ == '__main__':
-    # Create the output directory
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-
-    # Label the output file with the date/time it was created
-    dt = datetime.datetime.now().strftime('%y%m%d_%H%M')
-    outfile_name = os.path.join(OUTPUT_DIR, '%s_%s.hdf5' % (DATASET_NAME, dt))
-
-    fields = [
-        'img_id',
-        'rgb',
-        'depth_inpainted',
-        'bounding_boxes',
-        'grasp_points_img',
-        'angle_img',
-        'grasp_width'
-    ]
-
-    # Empty datatset.
-    dataset = {
-        'test':  dict([(f, []) for f in fields]),
-        'train': dict([(f, []) for f in fields])
-    }
-
-    temp = ["./data/jacquard/5c832b4698e78caeb8b2226f41012fcd/4_5c832b4698e78caeb8b2226f41012fcd", "./data/jacquard/7cc4096fb7eb6abc6e71174964d90e49/0_7cc4096fb7eb6abc6e71174964d90e49"]
-
-    all_ids = get_image_ids()
-
+def preprocessFiles(all_ids):
     for idx, img_id in enumerate(all_ids):
-    #for img_id in temp:
         print idx, "/", len(all_ids), img_id
 
+        suffix = img_id.split("/")[-1]
+
         # Decide whether this is train or test.
-        ds_output = 'train'
-        if TEST_IMAGES:
-            if int(img_id) in TEST_IMAGES:
-                print("This image is in TEST_IMAGES")
-                ds_output = 'test'
-        elif np.random.rand() > TRAIN_SPLIT:
-            ds_output = 'test'
-        ds = dataset[ds_output]
+        output_folder = OUTPUT_TRAIN_DIR + suffix
+        if np.random.rand() > TRAIN_SPLIT:
+            output_folder = OUTPUT_TEST_DIR + suffix
+
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+
 
         # Load the image
-
         file_img = img_id + "_RGB.png"
         file_grasps = img_id + "_grasps.txt"
         file_depth = img_id + "_perfect_depth.tiff"
@@ -101,8 +62,6 @@ if __name__ == '__main__':
         depth_img_base = depth_img_base - depth_img_base.min()
         depth_img_base = depth_img_base / depth_img_base.max()#normalize to 1
         depth_img_base = DepthImage(depth_img_base)
-
-
 
         # Load Grasps.
         bounding_boxes_base = grasp.BoundingBoxes()
@@ -144,74 +103,81 @@ if __name__ == '__main__':
         bounding_boxes_base.zoom(2, [0, 0])
 
         center = bounding_boxes_base.center
+        depth = depth_img_base
+        rgb = rgb_img_base
+        bbs = bounding_boxes_base.copy()
 
-        for i in range(RANDOM_ROTATIONS):
-            angle = np.random.random() * 2 * np.pi - np.pi
-            rgb = rgb_img_base.rotated(angle, center)
-            depth = depth_img_base.rotated(angle, center)
+        left = max(0, min(center[1] - OUTPUT_IMG_SIZE[1] // 2, rgb.shape[1] - OUTPUT_IMG_SIZE[1]))
+        right = min(rgb.shape[1], left + OUTPUT_IMG_SIZE[1])
 
-            bbs = bounding_boxes_base.copy()
-            bbs.rotate(angle, center)
+        top = max(0, min(center[0] - OUTPUT_IMG_SIZE[0] // 2, rgb.shape[0] - OUTPUT_IMG_SIZE[0]))
+        bottom = min(rgb.shape[0], top + OUTPUT_IMG_SIZE[0])
 
-            left = max(0, min(center[1] - OUTPUT_IMG_SIZE[1] // 2, rgb.shape[1] - OUTPUT_IMG_SIZE[1]))
-            right = min(rgb.shape[1], left + OUTPUT_IMG_SIZE[1])
+        rgb.crop((top, left), (bottom, right))
+        depth.crop((top, left), (bottom, right))
+        bbs.offset((-top, -left))
 
-            top = max(0, min(center[0] - OUTPUT_IMG_SIZE[0] // 2, rgb.shape[0] - OUTPUT_IMG_SIZE[0]))
-            bottom = min(rgb.shape[0], top + OUTPUT_IMG_SIZE[0])
+        depth.img = (depth.img - np.mean(depth.img)) / np.std(depth.img)
+        depth.img = np.clip(depth.img, -2, 2)#normalizing our way
 
-            rgb.crop((top, left), (bottom, right))
-            depth.crop((top, left), (bottom, right))
-            bbs.offset((-top, -left))
+        pos_img, ang_img, width_img = bbs.draw(depth.shape)
 
-            if RANDOM_ZOOM:
-                zoom_factor = np.random.uniform(0.8, 1.0)
-                rgb.zoom(zoom_factor)
-                depth.zoom(zoom_factor)
-                bbs.zoom(zoom_factor, (OUTPUT_IMG_SIZE[0]//2, OUTPUT_IMG_SIZE[1]//2))
+        if VISUALISE_ONLY:
+            print img_id
+            f = plt.figure()
+            ax = f.add_subplot(2, 2, 1)
+            rgb.show(ax)
+            #rgb_img_base.show(ax)
+            #bbs.show(ax)
+            ax = f.add_subplot(2, 2, 2)
+            depth.show(ax)
+            bbs.show(ax)
 
-            #depth.normalise()
-            depth.img = (depth.img - np.mean(depth.img)) / np.std(depth.img)
-            depth.img = np.clip(depth.img, -2, 2)#normalizing our way
+            #ax = f.add_subplot(1, 5, 3)
+            #ax.imshow(pos_img)
 
-            pos_img, ang_img, width_img = bbs.draw(depth.shape)
+            ax = f.add_subplot(2, 2, 3)
+            ax.imshow(ang_img)
 
-            if VISUALISE_ONLY:
-                print img_id
-                f = plt.figure()
-                ax = f.add_subplot(1, 5, 1)
-                rgb.show(ax)
-                #rgb_img_base.show(ax)
-                #bbs.show(ax)
-                ax = f.add_subplot(1, 5, 2)
-                depth.show(ax)
-                bbs.show(ax)
+            ax = f.add_subplot(2, 2, 4)
+            ax.imshow(width_img)
 
-                ax = f.add_subplot(1, 5, 3)
-                ax.imshow(pos_img)
+            #mng = plt.get_current_fig_manager()
+            #mng.resize(*mng.window.maxsize())
 
-                ax = f.add_subplot(1, 5, 4)
-                ax.imshow(ang_img)
+            plt.show()
+            continue
 
-                ax = f.add_subplot(1, 5, 5)
-                ax.imshow(width_img)
+        i = 1
+        
+        bbSave = bbs.to_array(pad_to=150)
 
-                mng = plt.get_current_fig_manager()
-                mng.resize(*mng.window.maxsize())
+        #io.imsave(output_folder + "/" + str(i) + "_RGB.png", rgb.img)
+        np.savez(output_folder + "/" + str(i) + "_data", depth=depth.img, pos=pos_img, 
+            ang=ang_img, width=width_img, bbs=bbSave, suffix=suffix, rgb=rgb.img)
 
-                plt.show()
-                continue
+def chunkIt(seq, num):
+    avg = len(seq) / float(num)
+    out = []
+    last = 0.0
 
-            ds['img_id'].append(img_id)
-            ds['rgb'].append(rgb.img)
-            ds['depth_inpainted'].append(depth.img)
-            ds['bounding_boxes'].append(bbs.to_array(pad_to=200))#if the list is variable length, hd5 will crash
-            ds['grasp_points_img'].append(pos_img)
-            ds['angle_img'].append(ang_img)
-            ds['grasp_width'].append(width_img)
+    while last < len(seq):
+        out.append(seq[int(last):int(last + avg)])
+        last += avg
 
-    # Save the output.
-    if not VISUALISE_ONLY:
-        with h5py.File(outfile_name, 'w') as f:
-            for tt_name in dataset:
-                for ds_name in dataset[tt_name]:
-                    f.create_dataset('%s/%s' % (tt_name, ds_name), data=np.array(dataset[tt_name][ds_name]))
+    return out
+
+if __name__ == '__main__':
+    # Create the output directory
+    if not os.path.exists(OUTPUT_TEST_DIR):
+        os.makedirs(OUTPUT_TEST_DIR)
+    if not os.path.exists(OUTPUT_TRAIN_DIR):
+        os.makedirs(OUTPUT_TRAIN_DIR)
+
+    all_ids = get_image_ids()
+    preprocessFiles(all_ids)
+    
+    '''PROCESSES = 4
+    id_chunks = chunkIt(all_ids, PROCESSES)
+
+    Parallel(n_jobs=PROCESSES, verbose=50)(delayed(preprocessFiles)(i)for i in id_chunks)'''
