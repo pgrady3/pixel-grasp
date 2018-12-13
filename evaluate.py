@@ -24,7 +24,8 @@ LOGFILE = 'evaluation_output.txt'
 
 NO_GRASPS = 1  # Number of local maxima to check against ground truth grasps.
 VISUALISE_FAILURES = False
-VISUALISE_SUCCESSES = False
+VISUALISE_SUCCESSES = True
+SAVE_OUTPUT = False
 
 #_pos_grasp_pattern = os.path.join(RAW_DATA_DIR, 'pcd%04dcpos.txt')
 
@@ -60,9 +61,7 @@ def plot_output(rgb_img, depth_img, grasp_position_img, grasp_angle_img, ground_
 
         ax = fig.add_subplot(2, 2, 2)
 
-        norm_depth = depth_img + depth_img.min()
-        norm_depth = norm_depth / norm_depth.max()
-        ax.imshow(norm_depth.squeeze())
+        ax.imshow(depth_img.squeeze())
         for g in gs:
             g.plot(ax, color='r')
 
@@ -194,15 +193,19 @@ def run():
                     print('Plotting Failures')
                     shuffle(failed)
                     for i in failed:
-                        file_name = "fail" + str(i) + ".png"
+                        file_name = None
+                        if SAVE_OUTPUT:
+                            file_name = "visualize/fail" + str(i) + ".png"
                         plot_output(rgb_imgs[i, ], depth_imgs[i, ], grasp_positions_out[i, ].squeeze(), grasp_angles_out[i, ].squeeze(), bbs_all[i],
-                                    no_grasps=NO_GRASPS, grasp_width_img=grasp_width_out[i, ].squeeze())#, file_name=file_name)
+                                    no_grasps=NO_GRASPS, grasp_width_img=grasp_width_out[i, ].squeeze(), file_name=file_name)
 
                 if VISUALISE_SUCCESSES:
                     print('Plotting Successes')
                     shuffle(succeeded)
                     for i in succeeded:
-                        file_name = "succ" + str(i) + ".png"
+                        file_name = None
+                        if SAVE_OUTPUT:
+                            file_name = "visualize/succ" + str(i) + ".png"
                         plot_output(rgb_imgs[i, ], depth_imgs[i, ], grasp_positions_out[i, ].squeeze(), grasp_angles_out[i, ].squeeze(), bbs_all[i],
                                     no_grasps=NO_GRASPS, grasp_width_img=grasp_width_out[i, ].squeeze(), file_name=file_name)
             write_log('Final epoch %d perf, %0.02f, %d %d\n' % (epoch, totalSuc / (totalSuc + totalFail), totalSuc, totalFail + totalSuc))

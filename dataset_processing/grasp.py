@@ -220,7 +220,10 @@ class BoundingBox:
 
     def plot(self, ax, color=None):
         points = np.vstack((self.points, self.points[0]))
-        ax.plot(points[:, 1], points[:, 0], color=color)
+        ax.plot(points[[0, 1], 1], points[[0, 1], 0], color=color, linewidth=1)
+        ax.plot(points[[1, 2], 1], points[[1, 2], 0], color=color, linewidth=3)
+        ax.plot(points[[2, 3], 1], points[[2, 3], 0], color=color, linewidth=1)
+        ax.plot(points[[3, 0], 1], points[[3, 0], 0], color=color, linewidth=3)
 
     def zoom(self, factor, center):
         T = np.array(
