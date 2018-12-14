@@ -8,7 +8,7 @@ import datagen
 
 from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras.layers import Conv2D, Conv2DTranspose
-from keras.layers import Input
+from keras.layers import Input, Reshape, Activation
 from keras.models import Model
 
 BATCH_SIZE = 8
@@ -63,7 +63,10 @@ for filter_sizes in FILTER_SIZES:
         # ===================================================================================================
         # Output layers
 
-        pos_output = Conv2D(1, kernel_size=2, padding='same', activation='linear', name='pos_out')(x)
+        #pos_output = Conv2D(1, kernel_size=2, padding='same', activation='linear', name='pos_out')(x)
+        pos_output_class = Conv2D(2, kernel_size=3, padding='same', activation='relu', name='pos_out_class')(x)
+        pos_reshaped = Reshape((300*300, 2))(pos_output_class)
+        pos_softmax = Activation('softmax')(pos_reshaped)
         cos_output = Conv2D(1, kernel_size=2, padding='same', activation='linear', name='cos_out')(x)
         sin_output = Conv2D(1, kernel_size=2, padding='same', activation='linear', name='sin_out')(x)
         width_output = Conv2D(1, kernel_size=2, padding='same', activation='linear', name='width_out')(x)
@@ -71,12 +74,10 @@ for filter_sizes in FILTER_SIZES:
         # ===================================================================================================
         # And go!
 
-        ae = Model(input_layer, [pos_output, cos_output, sin_output, width_output])
-        ae.compile(optimizer='rmsprop', loss='mean_squared_error')
+        ae = Model(input_layer, [pos_softmax, cos_output, sin_output, width_output])
+        ae.compile(optimizer='rmsprop', loss=['categorical_crossentropy', 'mean_squared_error', 'mean_squared_error', 'mean_squared_error'])
 
         ae.summary()
-
-        print "HERE----------------"
 
         with open(os.path.join(OUTPUT_FOLDER, '_description.txt'), 'w') as f:
             # Write description to file.
@@ -91,13 +92,9 @@ for filter_sizes in FILTER_SIZES:
             ModelCheckpoint(os.path.join(OUTPUT_FOLDER, 'epoch_{epoch:02d}_model.hdf5'), period=1),
         ]
 
-        print "MAKING GENERATORS"
-
         #train_set, test_set = datagen.get_data_list()
         train_generator = datagen.DataGenerator(batch_size = BATCH_SIZE, train=True)
         test_generator = datagen.DataGenerator(batch_size = BATCH_SIZE, train=False)
-
-        print "ABOUT TO TRAIN---------------------------"
 
         ae.fit_generator(generator=train_generator, validation_data=test_generator,
                         use_multiprocessing=True,

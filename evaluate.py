@@ -14,6 +14,7 @@ from dataset_processing.grasp import BoundingBoxes, detect_grasps
 import datagen
 
 # Networks to test.
+#NETWORK = 'data/networks/181214_1453*/'  # glob synatx to output network folders.
 NETWORK = 'data/networks/*/'  # glob synatx to output network folders.
 EPOCH = None  # Specify epoch or None to test all.
 
@@ -24,7 +25,7 @@ LOGFILE = 'evaluation_output.txt'
 
 NO_GRASPS = 1  # Number of local maxima to check against ground truth grasps.
 VISUALISE_FAILURES = False
-VISUALISE_SUCCESSES = True
+VISUALISE_SUCCESSES = False
 SAVE_OUTPUT = False
 
 #_pos_grasp_pattern = os.path.join(RAW_DATA_DIR, 'pcd%04dcpos.txt')
@@ -69,7 +70,8 @@ def plot_output(rgb_img, depth_img, grasp_position_img, grasp_angle_img, ground_
             g.plot(ax, color='g')
 
         ax = fig.add_subplot(2, 2, 3)
-        ax.imshow(grasp_position_img, cmap='Reds', vmin=0, vmax=1)
+        im = ax.imshow(grasp_position_img, cmap='Reds')#, vmin=0, vmax=1)
+        fig.colorbar(im, ax=ax)
 
         ax = fig.add_subplot(2, 2, 4)
         plot = ax.imshow(grasp_angle_img, cmap='hsv', vmin=-np.pi / 2, vmax=np.pi / 2)
@@ -127,22 +129,6 @@ def run():
         write_log(model_folder.split('/')[-1])
         write_log('\t')
 
-        '''dataset_fn = ''
-        with open(os.path.join(model_folder, '_dataset.txt')) as f:
-            dataset_fn = f.readline()
-            if dataset_fn[-1] == '\n':
-                dataset_fn = dataset_fn[:-1]'''
-
-        #f = h5py.File(dataset_fn, 'r')
-
-        #img_ids = np.array(f['test/img_id'])
-        #rgb_imgs = np.array(f['test/rgb'])
-
-        #depth_imgs = np.array(f['test/depth_inpainted'])
-        #bbs_all = np.array(f['test/bounding_boxes'])
-
-        #f.close()
-
         epochs = [EPOCH]
         if EPOCH is None:
             # Get all of them
@@ -175,6 +161,32 @@ def run():
 
                 model_output_data = model.predict(depth_imgs)
                 grasp_positions_out = model_output_data[0]
+
+                #grasp_positions_out = grasp_positions_out.reshape((-1, 300, 300, 2))
+                '''for i in range(500):
+
+                    fig = plt.figure(figsize=(10, 10))
+                    ax = fig.add_subplot(2, 2, 1)
+                    im = ax.imshow(grasp_positions_out[i, :, :, 0])
+                    fig.colorbar(im, ax=ax)
+
+                    ax = fig.add_subplot(2, 2, 2)
+                    im = ax.imshow(grasp_positions_out[i, :, :, 1])
+                    fig.colorbar(im, ax=ax)
+
+                    ax = fig.add_subplot(2, 2, 3)
+                    ax.imshow(rgb_imgs[i, ])
+
+                    ax = fig.add_subplot(2, 2, 4)
+                    im = ax.imshow(grasp_positions_out[i, :, :, 0])# - grasp_positions_out[i, :, :, 1])
+                    fig.colorbar(im, ax=ax)
+                    plt.show()
+
+                continue'''
+                if grasp_positions_out.shape[1] > 10000:#we're using a classification output that must be reshaped
+                    grasp_positions_out = grasp_positions_out.reshape((-1, 300, 300, 2))
+                    grasp_positions_out = grasp_positions_out[:, :, :, 0]# - grasp_positions_out[:, :, :, 1]
+
                 grasp_angles_out = np.arctan2(model_output_data[2], model_output_data[1])/2.0
                 grasp_width_out = model_output_data[3] * 150.0
 

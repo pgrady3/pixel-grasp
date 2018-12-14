@@ -281,7 +281,7 @@ def detect_grasps(point_img, ang_img, width_img=None, no_grasps=1, ang_threshold
     """
     Detect Grasps in a GG-CNN output.
     """
-    local_max = peak_local_max(point_img, min_distance=20, threshold_abs=0.2, num_peaks=no_grasps)
+    local_max = peak_local_max(point_img, min_distance=20, num_peaks=no_grasps)#, threshold_abs=0.2, )
 
     grasps = []
 

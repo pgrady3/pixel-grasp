@@ -59,7 +59,8 @@ class DataGenerator(keras.utils.Sequence):
         'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
         # Initialization
         X =     np.empty((self.batch_size, OUTPUT_IMG_SIZE[0], OUTPUT_IMG_SIZE[1], self.n_channels))
-        Y_pts = np.empty((self.batch_size, OUTPUT_IMG_SIZE[0], OUTPUT_IMG_SIZE[1], self.n_channels))
+        Y_pts = np.zeros((self.batch_size, OUTPUT_IMG_SIZE[0] * OUTPUT_IMG_SIZE[1], 2))
+        #Y_pts = np.empty((self.batch_size, OUTPUT_IMG_SIZE[0], OUTPUT_IMG_SIZE[1], self.n_channels))
         Y_wid = np.empty((self.batch_size, OUTPUT_IMG_SIZE[0], OUTPUT_IMG_SIZE[1], self.n_channels))
         Y_sin = np.empty((self.batch_size, OUTPUT_IMG_SIZE[0], OUTPUT_IMG_SIZE[1], self.n_channels))
         Y_cos = np.empty((self.batch_size, OUTPUT_IMG_SIZE[0], OUTPUT_IMG_SIZE[1], self.n_channels))
@@ -72,7 +73,9 @@ class DataGenerator(keras.utils.Sequence):
             data = np.load(ID)
 
             X[i, :, :, 0] = data['depth']
-            Y_pts[i, :, :, 0] = data['pos']
+            Y_pts[i, :, 0] = data['pos'].flatten()
+            Y_pts[i, :, 1] = 1-data['pos'].flatten()
+            #Y_pts[i, :, :, 0] = data['pos']
             Y_wid[i, :, :, 0] = np.clip(data['width'], 0, 150)/150.0
             Y_sin[i, :, :, 0] = np.sin(2*data['ang'])
             Y_cos[i, :, :, 0] = np.cos(2*data['ang'])
