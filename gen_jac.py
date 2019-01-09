@@ -79,14 +79,22 @@ def preprocessFiles(all_ids):
                 opening = float(split[3])   #opening of the jaws. useful
                 jaws_size = float(split[4]) #width of the jaws. not that useful
 
-                key = (x, y, theta, opening)
+                points = np.array([[0, 0], [0, opening], [jaws_size, opening], [jaws_size, 0]])
+                bb = grasp.BoundingBox(points)
+                bb.offset([-0.5 * jaws_size, -0.5 * opening])#center it
+                bb.rotate(-theta, [0, 0])#rotate it
+                bb.offset([y, x])#offset it
+
+                bounding_boxes_base.append(bb)
+
+                '''key = (x, y, theta, opening)
                 if key in bbDict:
                     if jaws_size > bbDict[key]:#just keep the biggest jaws size
                         bbDict[key] = jaws_size
                 else:
-                    bbDict[key] = jaws_size
+                    bbDict[key] = jaws_size'''
 
-        for bb in bbDict:
+        '''for bb in bbDict:
             x, y, theta, opening = bb
             jaws_size = bbDict[bb]
 
@@ -96,7 +104,7 @@ def preprocessFiles(all_ids):
             bb.rotate(-theta, [0, 0])#rotate it
             bb.offset([y, x])#offset it
 
-            bounding_boxes_base.append(bb)
+            bounding_boxes_base.append(bb)'''
 
         rgb_img_base.resize((rgb_img_base.shape[0] / 2, rgb_img_base.shape[1] / 2))
         depth_img_base.resize((depth_img_base.shape[0] / 2, depth_img_base.shape[1] / 2))
