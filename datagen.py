@@ -14,23 +14,25 @@ from dataset_processing import grasp
 
 OUTPUT_IMG_SIZE = (300, 300, 1)
 
-def get_data_list(train=True):
-    'Returns train/test lists of file prefixes'
-
-    if train:
-        ims = glob.glob("./data/train/*/*.npz")
-    else:
-        ims = glob.glob("./data/test/*/*.npz")
-
-    return ims
-
 
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
     def __init__(self, batch_size=32, train=True):
-        'Initialization'
+        
+        print "Loading data from disk...."
+        if train:
+            data = np.load('data/jacAll/train.npz')
+        else:
+            data = np.load('data/jacAll/test.npz')
+
+        self.rgb_arr = data['rgb_arr']
+        self.depth_arr = data['depth_arr']
+        self.bbs_arr = data['bbs_arr']
+
+        print "Done loading data"
+
         self.batch_size = batch_size
-        self.list_IDs = get_data_list(train)
+        self.list_IDs = range(self.bbs_arr.shape[0])
         self.n_channels = 1
         self.train = train
         self.on_epoch_end()
@@ -69,20 +71,25 @@ class DataGenerator(keras.utils.Sequence):
 
         # Generate data
         for i, ID in enumerate(list_IDs_temp):
-            # Store sample
-            data = np.load(ID)
+            depth = self.depth_arr[ID, :, :]
+            rgb = self.rgb_arr[ID, :, :, :]
+            bbs = grasp.BoundingBoxes.load_from_array(self.bbs_arr[ID, :, :, :])
 
-            X[i, :, :, 0] = data['depth']
-            Y_pts[i, :, 0] = data['pos'].flatten()
-            Y_pts[i, :, 1] = 1-data['pos'].flatten()
+            pos_img, ang_img, width_img = bbs.draw(depth.shape)
+            X[i, :, :, 0] = depth
+
+
+
+            Y_pts[i, :, 0] = pos_img.flatten()
+            Y_pts[i, :, 1] = 1-pos_img.flatten()
             #Y_pts[i, :, :, 0] = data['pos']
-            Y_wid[i, :, :, 0] = np.clip(data['width'], 0, 150)/150.0
-            Y_sin[i, :, :, 0] = np.sin(2*data['ang'])
-            Y_cos[i, :, :, 0] = np.cos(2*data['ang'])
+            Y_wid[i, :, :, 0] = np.clip(width_img, 0, 150)/150.0
+            Y_sin[i, :, :, 0] = np.sin(2*ang_img)
+            Y_cos[i, :, :, 0] = np.cos(2*ang_img)
 
         return X, [Y_pts, Y_cos, Y_sin, Y_wid]
 
-    def getTrain(self, index):
+    def getTest(self, index):
         indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
         # Find list of IDs
         list_IDs_temp = [self.list_IDs[k] for k in indexes]
@@ -92,12 +99,13 @@ class DataGenerator(keras.utils.Sequence):
         bbs = []
 
         for i, ID in enumerate(list_IDs_temp):
-            # Store sample
-            data = np.load(ID)
+            depth = self.depth_arr[ID, :, :]
+            rgb = self.rgb_arr[ID, :, :, :]
 
-            X[i, :, :, 0] = data['depth']
-            RGB[i, :, :, :] = data['rgb']
-            bbs.append(data['bbs'])
+            X[i, :, :, 0] = depth
+            RGB[i, :, :, :] = rgb
+
+            bbs.append(self.bbs_arr[ID, :, :, :])
 
         return X, RGB.astype(np.uint8), bbs
 

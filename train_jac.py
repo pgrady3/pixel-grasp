@@ -94,11 +94,11 @@ for filter_sizes in FILTER_SIZES:
 
         #train_set, test_set = datagen.get_data_list()
         train_generator = datagen.DataGenerator(batch_size = BATCH_SIZE, train=True)
-        test_generator = datagen.DataGenerator(batch_size = BATCH_SIZE, train=False)
+        #test_generator = datagen.DataGenerator(batch_size = BATCH_SIZE, train=False)
 
-        ae.fit_generator(generator=train_generator, validation_data=test_generator,
+        ae.fit_generator(generator=train_generator,# validation_data=test_generator,
                         use_multiprocessing=True,
-                        workers=8,
+                        workers=6,#we have 8 cores, so leave a few open?
                         epochs=100,
                         shuffle=True,
                         callbacks=my_callbacks,

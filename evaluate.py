@@ -14,7 +14,7 @@ from dataset_processing.grasp import BoundingBoxes, detect_grasps
 import datagen
 
 # Networks to test.
-#NETWORK = 'data/networks/181214_1453*/'  # glob synatx to output network folders.
+#NETWORK = 'data/networks/19*/'  # evaluate just one epoch
 NETWORK = 'data/networks/*/'  # glob synatx to output network folders.
 EPOCH = None  # Specify epoch or None to test all.
 
@@ -103,6 +103,8 @@ def calculate_iou_matches(grasp_positions_out, grasp_angles_out, ground_truth_bb
             grasp_width = None
 
         gt_bbs = BoundingBoxes.load_from_array(ground_truth_bbs[i].squeeze())
+        #gt_bbs = ground_truth_bbs
+
         gs = detect_grasps(grasp_position, grasp_angle, width_img=grasp_width, no_grasps=no_grasps, ang_threshold=0)
         for g in gs:
             if g.max_iou(gt_bbs) > min_iou:
@@ -157,12 +159,11 @@ def run():
             write_log('Epoch no %d ' % epoch)
 
             for batchNum in range(len(gen)):
-                depth_imgs, rgb_imgs, bbs_all = gen.getTrain(batchNum)
+                depth_imgs, rgb_imgs, bbs_all = gen.getTest(batchNum)
 
                 model_output_data = model.predict(depth_imgs)
                 grasp_positions_out = model_output_data[0]
 
-                #grasp_positions_out = grasp_positions_out.reshape((-1, 300, 300, 2))
                 '''for i in range(500):
 
                     fig = plt.figure(figsize=(10, 10))

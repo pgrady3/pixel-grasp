@@ -12,7 +12,7 @@ from dataset_processing.image import Image, DepthImage
 from dataset_processing import grasp
 
 OUTPUT_IMG_SIZE = (300, 300)
-BB_SAVE = 600 #length of bounding box padding array
+BB_SAVE = 1200 #length of bounding box padding array
 
 TRAIN_SPLIT = 0.8
 VISUALISE_ONLY = False
@@ -103,7 +103,7 @@ def save_subset(ids, outfile):
         depth_arr[i, :, :] = depth.img
         bbs_arr[i, :, :, :] = bbSave
 
-    np.savez(outfile, rgb_arr=rgb_arr, depth_arr=depth_arr, bbs=bbSave, bbs_arr=bbs_arr, suffix=suffix)
+    np.savez(outfile, rgb_arr=rgb_arr, depth_arr=depth_arr, bbs_arr=bbs_arr)
 
 if __name__ == '__main__':
     all_ids = get_image_ids()
